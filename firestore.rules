@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      // In this app environment, we allow any auth'd user, but check verification if available
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email != null);
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == "skbitservice@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // ====== Collection matched rules ======
+
+    // 1. PRODUCTS
+    match /products/{productId} {
+      allow read: if true; // Public listings
+      allow write: if isAdmin();
+    }
+
+    // 2. USERS
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId && (
+        // Protect role field from self-escalation
+        (!incoming().diff(existing()).affectedKeys().hasAny(['role'])) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. ADDRESSES (Subcollection under users)
+    match /users/{userId}/addresses/{addressId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // 4. ORDERS
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (resource.data.userId == request.auth.uid && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['transactionId', 'upiRefNumber', 'screenshotUrl', 'paymentStatus', 'orderStatus', 'updatedAt']) &&
+         // User can cancel or update their own order's payment details
+         (incoming().orderStatus == 'cancelled' || incoming().orderStatus == existing().orderStatus))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 5. SUPPORT TICKETS
+    match /tickets/{ticketId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (resource.data.userId == request.auth.uid && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'messages', 'updatedAt', 'message']))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 6. CONTACT SUBMISSIONS
+    match /contacts/{contactId} {
+      allow create: if true; // Anybody can submit contact enquiry
+      allow read, update, delete: if isAdmin();
+    }
+
+    // 7. SETTINGS
+    match /settings/global {
+      allow read: if true; // All visitors can fetch settings (dynamic UPI ID and contact details)
+      allow write: if isAdmin();
+    }
+  }
+}

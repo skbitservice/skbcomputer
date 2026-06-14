@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Represents a repair service or computer accessory for sale",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The custom or generated identifier" },
+        "name": { "type": "string", "description": "The name of the service or product" },
+        "category": { "type": "string", "enum": ["service", "accessory"], "description": "The type of listing" },
+        "description": { "type": "string", "description": "Brief informational text" },
+        "price": { "type": "number", "description": "Pricing in INR" },
+        "stock": { "type": "number", "description": "Available stock (accessories) or placeholder (services)" },
+        "image_url": { "type": "string", "description": "A URL linking to the product image" },
+        "active": { "type": "boolean", "description": "Visibility flag on main site" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "category", "price", "stock", "active"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Information about secondary accounts or admin accounts",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Address": {
+      "title": "Address",
+      "description": "A nested structure or document representing a shipping address",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "pinCode": { "type": "string" },
+        "isDefault": { "type": "boolean" }
+      },
+      "required": ["userId", "fullName", "phone", "street", "city", "state", "pinCode"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "An electronic purchase or service order tracking UPI flow",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "items": { "type": "array", "description": "List of cart items containing productId, name, price, quantity" },
+        "billingAddress": { "type": "object" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["UPI"] },
+        "paymentStatus": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "orderStatus": { "type": "string", "enum": ["placed", "processing", "shipped", "completed", "cancelled"] },
+        "transactionId": { "type": "string" },
+        "upiRefNumber": { "type": "string" },
+        "screenshotUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items", "totalAmount", "paymentStatus", "orderStatus"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Customer issues or service questions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "messages": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "subject", "message", "status"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "A listing of messages sent from the landing contact form",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "issue": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "phone", "issue"]
+    },
+    "GlobalSettings": {
+      "title": "GlobalSettings",
+      "description": "Variables for customization like current active UPI ID",
+      "type": "object",
+      "properties": {
+        "upiId": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "products/{productId}": {
+      "schema": "Product",
+      "description": "Product collection"
+    },
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profile collection"
+    },
+    "users/{userId}/addresses/{addressId}": {
+      "schema": "Address",
+      "description": "User specific shipping addresses"
+    },
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "User and Admin orders"
+    },
+    "tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "Support tickets for user-admin communications"
+    },
+    "contacts/{contactId}": {
+      "schema": "ContactMessage",
+      "description": "Contact submissions"
+    },
+    "settings/global": {
+      "schema": "GlobalSettings",
+      "description": "System settings"
+    }
+  }
+}
