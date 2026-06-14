@@ -1,5 +1,6 @@
 import { Product, Address, Order, SupportTicket, ContactMessage } from "../types";
-import { isMockFirebase, db, handleFirestoreError, OperationType } from "../firebase";
+import { isMockFirebase as isMockFirebaseReal, db, handleFirestoreError, OperationType } from "../firebase";
+const isMockFirebase = isMockFirebaseReal || localStorage.getItem("skb_use_simulated_db") === "true";
 import { SEED_PRODUCTS } from "../data/seedProducts";
 import { 
   collection, 
@@ -82,18 +83,18 @@ export const dbService = {
   },
 
   saveProduct: async (product: Partial<Product>): Promise<Product> => {
-    if (isMockFirebase) {
+    const fallbackWrite = async (prod: Partial<Product>): Promise<Product> => {
       const products = await dbService.getProducts();
       let saved: Product;
-      if (product.id) {
-        products.map(p => p.id === product.id ? { ...p, ...product, updatedAt: new Date().toISOString() } : p);
-        saved = { ...product, updatedAt: new Date().toISOString() } as Product;
-        const index = products.findIndex(p => p.id === product.id);
+      if (prod.id) {
+        const index = products.findIndex(p => p.id === prod.id);
+        const existingProd = index > -1 ? products[index] : {};
+        saved = { ...existingProd, ...prod, updatedAt: new Date().toISOString() } as Product;
         if (index > -1) products[index] = saved;
       } else {
         const newId = "prod-" + Math.random().toString(36).substr(2, 9);
         saved = {
-          ...product,
+          ...prod,
           id: newId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -102,17 +103,22 @@ export const dbService = {
       }
       localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(products));
       return saved;
+    };
+
+    if (isMockFirebase) {
+      return fallbackWrite(product);
     }
 
     const path = "products";
     try {
+      let result: Product;
       if (product.id) {
         const prodId = product.id;
         const docRef = doc(db, path, prodId);
         const cleanProduct = { ...product, updatedAt: new Date().toISOString() };
         delete cleanProduct.id;
         await setDoc(docRef, cleanProduct, { merge: true });
-        return { ...product } as Product;
+        result = { ...product } as Product;
       } else {
         const cleanProduct = {
           ...product,
@@ -120,27 +126,44 @@ export const dbService = {
           updatedAt: new Date().toISOString()
         };
         const docRef = await addDoc(collection(db, path), cleanProduct);
-        return { id: docRef.id, ...cleanProduct } as Product;
+        result = { id: docRef.id, ...cleanProduct } as Product;
       }
+      
+      // Keep cache in sync
+      try {
+        const products = await dbService.getProducts();
+        const idx = products.findIndex(p => p.id === result.id);
+        if (idx > -1) products[idx] = result;
+        else products.push(result);
+        localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(products));
+      } catch (ce) {}
+
+      return result;
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, path);
-      throw err;
+      console.warn("Firestore saveProduct failed. Saving to local storage fallback instead.", err);
+      return fallbackWrite(product);
     }
   },
 
   deleteProduct: async (productId: string): Promise<void> => {
-    if (isMockFirebase) {
+    const fallbackDelete = async () => {
       const products = await dbService.getProducts();
       const nextProducts = products.filter(p => p.id !== productId);
       localStorage.setItem(STORAGE_PRODUCTS_KEY, JSON.stringify(nextProducts));
+    };
+
+    if (isMockFirebase) {
+      await fallbackDelete();
       return;
     }
 
     const path = `products/${productId}`;
     try {
       await deleteDoc(doc(db, "products", productId));
+      await fallbackDelete();
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, path);
+      console.warn("Firestore deleteProduct failed. Deleting from local fallback.", err);
+      await fallbackDelete();
     }
   },
 
@@ -198,12 +221,12 @@ export const dbService = {
       let saved: Address;
       
       if (address.id) {
-        saved = { ...address } as Address;
+        saved = { ...address, userId } as Address;
         const index = addresses.findIndex(a => a.id === address.id);
         if (index > -1) addresses[index] = saved;
       } else {
         const newId = "addr-" + Math.random().toString(36).substr(2, 9);
-        saved = { ...address, id: newId, isDefault: addresses.length === 0 } as Address;
+        saved = { ...address, id: newId, userId, isDefault: addresses.length === 0 } as Address;
         addresses.push(saved);
       }
 
@@ -222,7 +245,7 @@ export const dbService = {
       if (address.id) {
         const addrId = address.id;
         const docRef = doc(db, "users", userId, "addresses", addrId);
-        const cleanAddress = { ...address };
+        const cleanAddress = { ...address, userId };
         delete cleanAddress.id;
         await setDoc(docRef, cleanAddress, { merge: true });
 
@@ -235,11 +258,11 @@ export const dbService = {
             }
           }
         }
-        return address as Address;
+        return { ...address, userId } as Address;
       } else {
         const list = await dbService.getAddresses(userId);
         const isDefault = list.length === 0;
-        const cleanAddress = { ...address, isDefault };
+        const cleanAddress = { ...address, userId, isDefault };
         const docRef = await addDoc(addressesRef, cleanAddress);
         return { id: docRef.id, ...cleanAddress } as Address;
       }

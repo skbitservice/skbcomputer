@@ -44,6 +44,7 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
   const [shipState, setShipState] = useState("Delhi");
   const [shipPinCode, setShipPinCode] = useState("");
   const [addrError, setAddrError] = useState("");
+  const [addrSuccess, setAddrSuccess] = useState("");
 
   // UPI Verification Form States
   const [txnId, setTxnId] = useState("");
@@ -135,6 +136,9 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
         pinCode: shipPinCode,
         isDefault: addresses.length === 0
       });
+
+      setAddrSuccess("New delivery address registered successfully!");
+      setTimeout(() => setAddrSuccess(""), 4500);
 
       const nextList = await dbService.getAddresses(user.uid);
       setAddresses(nextList);
@@ -470,6 +474,7 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
                   {savingAddress ? "Registering Address..." : "Add Delivery Destination"}
                 </button>
 
+                {addrSuccess && <p className="text-[11px] text-emerald-700 font-bold">{addrSuccess}</p>}
                 {addrError && <p className="text-[11px] text-red-600 font-semibold">{addrError}</p>}
               </form>
             </div>

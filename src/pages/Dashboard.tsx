@@ -44,6 +44,7 @@ export const Dashboard: React.FC = () => {
   const [state, setState] = useState("Delhi");
   const [pinCode, setPinCode] = useState("");
   const [addrError, setAddrError] = useState("");
+  const [addrSuccess, setAddrSuccess] = useState("");
 
   // Invoice view simulator state
   const [simulatedInvoiceOrder, setSimulatedInvoiceOrder] = useState<Order | null>(null);
@@ -198,6 +199,8 @@ export const Dashboard: React.FC = () => {
         pinCode,
         isDefault: addresses.length === 0
       });
+      setAddrSuccess("Address saved successfully!");
+      setTimeout(() => setAddrSuccess(""), 4500);
       // Clear inputs & reload
       setFullName("");
       setAddrPhone("");
@@ -207,23 +210,35 @@ export const Dashboard: React.FC = () => {
       const list = await dbService.getAddresses(user.uid);
       setAddresses(list);
     } catch (err) {
-      setAddrError("Failed to store adress.");
+      setAddrError("Failed to store address.");
     }
   };
 
   const handleDeleteAddress = async (id: string) => {
     if (!user) return;
     if (!confirm("Are you sure you want to delete this address?")) return;
-    await dbService.deleteAddress(user.uid, id);
-    const list = await dbService.getAddresses(user.uid);
-    setAddresses(list);
+    try {
+      await dbService.deleteAddress(user.uid, id);
+      setAddrSuccess("Address successfully deleted!");
+      setTimeout(() => setAddrSuccess(""), 4500);
+      const list = await dbService.getAddresses(user.uid);
+      setAddresses(list);
+    } catch (err) {
+      setAddrError("Failed to delete address.");
+    }
   };
 
   const handleToggleDefaultAddress = async (id: string) => {
     if (!user) return;
-    await dbService.setDefaultAddress(user.uid, id);
-    const list = await dbService.getAddresses(user.uid);
-    setAddresses(list);
+    try {
+      await dbService.setDefaultAddress(user.uid, id);
+      setAddrSuccess("Default shipping address updated successfully!");
+      setTimeout(() => setAddrSuccess(""), 4500);
+      const list = await dbService.getAddresses(user.uid);
+      setAddresses(list);
+    } catch (err) {
+      setAddrError("Failed to make default.");
+    }
   };
 
   return (
@@ -653,6 +668,7 @@ export const Dashboard: React.FC = () => {
                       </button>
                     </div>
 
+                    {addrSuccess && <p className="text-[11px] text-emerald-700 font-bold">{addrSuccess}</p>}
                     {addrError && <p className="text-[11px] text-red-600 font-semibold">{addrError}</p>}
                   </form>
                 )}
@@ -660,6 +676,16 @@ export const Dashboard: React.FC = () => {
                 {/* Sublist mapping */}
                 {!showAddAddr && (
                   <div className="space-y-4">
+                    {addrSuccess && (
+                      <div className="bg-emerald-50 border border-emerald-300 text-xs font-semibold px-4 py-3 rounded-lg leading-relaxed animate-pulse">
+                        {addrSuccess}
+                      </div>
+                    )}
+                    {addrError && (
+                      <div className="bg-red-50 border border-red-300 text-xs font-semibold px-4 py-3 rounded-lg leading-relaxed text-red-600">
+                        {addrError}
+                      </div>
+                    )}
                     {addresses.length > 0 ? (
                       <div className="grid grid-cols-1 gap-3">
                         {addresses.map((addr) => (

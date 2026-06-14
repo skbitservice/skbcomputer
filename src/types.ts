@@ -24,6 +24,7 @@ export interface UserRoleProfile {
 
 export interface Address {
   id: string;
+  userId?: string;
   fullName: string;
   phone: string;
   street: string;

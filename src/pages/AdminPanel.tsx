@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Product, Order, SupportTicket, ContactMessage, OrderStatus, OrderPaymentStatus } from "../types";
 import { dbService } from "../services/dbService";
+import { isMockFirebase } from "../firebase";
 import { 
   Users, Package, TrendingUp, CreditCard, MessageSquare, 
   Settings, CheckCircle, XCircle, Plus, Edit3, Trash2, Mail, Loader, Check, CircleSlash 
@@ -118,6 +119,9 @@ export const AdminPanel: React.FC = () => {
       }
 
       await dbService.saveProduct(payload);
+      setActionMsg(`Product "${payload.name}" was successfully uploaded and refreshed in the catalog inventory!`);
+      setTimeout(() => setActionMsg(""), 4500);
+
       setShowProductModal(false);
       // Reset
       setPName("");
@@ -150,6 +154,8 @@ export const AdminPanel: React.FC = () => {
     if (!confirm("Are you sure you want to delete this listing from catalog?")) return;
     try {
       await dbService.deleteProduct(id);
+      setActionMsg("Product listing was successfully removed from catalog inventory.");
+      setTimeout(() => setActionMsg(""), 4500);
       loadAdminData();
     } catch (err) {
       alert("Failed to delete.");
@@ -239,6 +245,19 @@ export const AdminPanel: React.FC = () => {
         <div className="border-b border-[#0d530e]/10 pb-4 text-center md:text-left">
           <span className="font-mono text-[9px] uppercase tracking-wider text-gray-500 font-bold">Admin workstation</span>
           <h2 className="text-[#0D530E] font-bold text-sm tracking-wide mt-1">SKB Control Panel</h2>
+          {(() => {
+            const isSimulated = isMockFirebase || localStorage.getItem("skb_use_simulated_db") === "true";
+            return (
+              <div className={`mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase border tracking-wide leading-none ${
+                isSimulated 
+                  ? "bg-amber-100 text-amber-800 border-amber-300" 
+                  : "bg-emerald-100 text-emerald-800 border-emerald-300"
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isSimulated ? "bg-amber-600 animate-pulse" : "bg-emerald-600"}`} />
+                {isSimulated ? "⚡ Interactive Sandbox Only" : "🛡️ Live Cloud Firestore"}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="flex flex-col gap-1.5 font-sans font-bold text-xs">

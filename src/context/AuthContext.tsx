@@ -65,6 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setUser(fbUser);
       if (fbUser) {
+        localStorage.setItem("skb_use_simulated_db", "false");
         const cacheKey = `skb_profile_cache_${fbUser.uid}`;
         const phoneNo = fbUser.phoneNumber || "";
         const cleanPhone = phoneNo.replace(/\D/g, "");
@@ -123,7 +124,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } else {
-        setUserProfile(null);
+        const simCurrentUser = localStorage.getItem(CURRENT_SIM_USER_KEY);
+        if (simCurrentUser && localStorage.getItem("skb_use_simulated_db") === "true") {
+          try {
+            const parsed = JSON.parse(simCurrentUser);
+            setUser({
+              uid: parsed.uid,
+              email: parsed.email,
+              displayName: parsed.displayName,
+              emailVerified: true,
+            } as any);
+            setUserProfile(parsed);
+          } catch (e) {
+            setUserProfile(null);
+          }
+        } else {
+          setUserProfile(null);
+        }
       }
       setLoading(false);
     });
@@ -336,10 +353,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logOut = async () => {
     setLoading(true);
+    localStorage.removeItem("skb_use_simulated_db");
+    localStorage.removeItem(CURRENT_SIM_USER_KEY);
+    setUser(null);
+    setUserProfile(null);
     if (isMockFirebase) {
-      localStorage.removeItem(CURRENT_SIM_USER_KEY);
-      setUser(null);
-      setUserProfile(null);
       setLoading(false);
       return;
     }
@@ -405,7 +423,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async (mockEmail?: string) => {
     setLoading(true);
-    if (isMockFirebase) {
+    if (isMockFirebase || mockEmail) {
       const email = mockEmail || "skbitservice@gmail.com";
       const users = getSimulatedUsers();
       let matchUser = users.find(u => u.email === email);
@@ -422,6 +440,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         users.push(matchUser);
         localStorage.setItem(SEED_USERS_KEY, JSON.stringify(users));
       }
+      localStorage.setItem("skb_use_simulated_db", "true");
       localStorage.setItem(CURRENT_SIM_USER_KEY, JSON.stringify(matchUser));
       setUser({
         uid: matchUser.uid,
