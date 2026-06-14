@@ -63,9 +63,8 @@ export default function App() {
             {view === "auth" && (
               <Auth 
                 setView={handleSetView} 
-                onSuccess={() => {
-                  const userEmail = auth?.currentUser?.email || "";
-                  if (userEmail.toLowerCase() === "skbitservice@gmail.com") {
+                onSuccess={(isAdminUser) => {
+                  if (isAdminUser) {
                     handleSetView("admin-panel");
                   } else {
                     handleSetView("user-dashboard");
