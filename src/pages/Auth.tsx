@@ -560,32 +560,7 @@ Step-by-step instructions to enable:
               <span>Sign In with Google</span>
             </button>
 
-            {/* Quick Sandbox Login Actions for Review ease */}
-            {(isMock || true) && (
-              <div className="flex flex-col gap-1.5 justify-center mt-1 text-center bg-[#4a6b43]/5 border border-[#4a6b43]/15 rounded-lg p-2.5">
-                <p className="text-[10px] text-[#4A6B43] font-bold uppercase tracking-wider mb-1">
-                  ⚡ Reviewer Sandbox Bypass:
-                </p>
-                <div className="flex gap-2 justify-center">
-                  <button
-                    type="button"
-                    onClick={() => handleGoogleLogin("skbitservice@gmail.com")}
-                    className="px-2.5 py-1.5 bg-[#306D29]/15 hover:bg-[#306D29]/25 text-[#306D29] border border-[#306D29]/25 rounded text-[9px] font-mono font-bold uppercase cursor-pointer transition flex items-center gap-1"
-                    title="Simulate Google Login as Main Admin (skbitservice@gmail.com)"
-                  >
-                    🚀 Admin Bypass
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleGoogleLogin("customer@gmail.com")}
-                    className="px-2.5 py-1.5 bg-gray-500/15 hover:bg-gray-500/25 text-gray-700 border border-gray-500/25 rounded text-[9px] font-mono font-bold uppercase cursor-pointer transition flex items-center gap-1"
-                    title="Simulate Google Login as customer@gmail.com"
-                  >
-                    🚀 User Bypass
-                  </button>
-                </div>
-              </div>
-            )}
+
 
             {/* Phone connection trigger button */}
             {mode !== "phone-login" ? (

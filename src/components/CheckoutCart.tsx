@@ -29,7 +29,8 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
   
   // Checkout Stages: "cart" -> "shipping" -> "payment" -> "receipt"
   const [stage, setStage] = useState<"cart" | "shipping" | "payment" | "receipt">("cart");
-  const [upiId, setUpiId] = useState("7011396007@paytm");
+  const [upiId, setUpiId] = useState("skbcomputer86@kotak");
+  const [upiQrUrl, setUpiQrUrl] = useState("");
 
   // Address System States
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -43,6 +44,7 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
   const [shipCity, setShipCity] = useState("New Delhi");
   const [shipState, setShipState] = useState("Delhi");
   const [shipPinCode, setShipPinCode] = useState("");
+  const [shipIsDefault, setShipIsDefault] = useState(true);
   const [addrError, setAddrError] = useState("");
   const [addrSuccess, setAddrSuccess] = useState("");
 
@@ -74,8 +76,9 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
   useEffect(() => {
     const fetchGlobalSettings = async () => {
       const settings = await dbService.getGlobalSettings();
-      if (settings && settings.upiId) {
-        setUpiId(settings.upiId);
+      if (settings) {
+        if (settings.upiId) setUpiId(settings.upiId);
+        if (settings.upiQrUrl) setUpiQrUrl(settings.upiQrUrl);
       }
     };
     fetchGlobalSettings();
@@ -134,7 +137,7 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
         city: shipCity,
         state: shipState,
         pinCode: shipPinCode,
-        isDefault: addresses.length === 0
+        isDefault: shipIsDefault || addresses.length === 0
       });
 
       setAddrSuccess("New delivery address registered successfully!");
@@ -148,6 +151,9 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
       setShipPhone("");
       setShipStreet("");
       setShipPinCode("");
+      setShipCity("New Delhi");
+      setShipState("Delhi");
+      setShipIsDefault(true);
     } catch (err) {
       setAddrError("Failed to store address information.");
     } finally {
@@ -373,8 +379,9 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
                 {addresses.length > 0 ? (
                   <div className="grid grid-cols-1 gap-2.5">
                     {addresses.map((addr) => (
-                      <label 
+                      <div 
                         key={addr.id} 
+                        onClick={() => setSelectedAddressId(addr.id)}
                         className={`flex gap-3 p-4 bg-gray-50 rounded-xl cursor-pointer border hover:border-[#306D29] transition ${
                           selectedAddressId === addr.id ? "border-[#306D29] bg-emerald-50/10" : "border-gray-200/50"
                         }`}
@@ -388,19 +395,43 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
                           className="mt-1 text-[#306D29] focus:ring-[#306D29]"
                         />
                         <div className="text-xs leading-relaxed flex-grow">
-                          <strong className="text-gray-900 text-sm font-sans flex items-center gap-2">
-                            <span>{addr.fullName}</span>
-                            {addr.isDefault && (
-                              <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-1.5 py-0.5 rounded tracking-wide font-mono uppercase">
-                                Default
-                              </span>
+                          <div className="flex justify-between items-start gap-2">
+                            <strong className="text-gray-900 text-sm font-sans flex items-center gap-2">
+                              <span>{addr.fullName}</span>
+                              {addr.isDefault && (
+                                <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-1.5 py-0.5 rounded tracking-wide font-mono uppercase">
+                                  Default
+                                </span>
+                              )}
+                            </strong>
+                            {!addr.isDefault && (
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (user) {
+                                    try {
+                                      await dbService.setDefaultAddress(user.uid, addr.id);
+                                      const nextList = await dbService.getAddresses(user.uid);
+                                      setAddresses(nextList);
+                                      setSelectedAddressId(addr.id);
+                                    } catch (err) {
+                                      console.error("Failed to select default address:", err);
+                                    }
+                                  }
+                                }}
+                                className="text-[9px] text-[#4A6B43] hover:text-[#306D29] hover:bg-emerald-50 border border-gray-300 hover:border-[#306D29] px-1.5 py-0.5 rounded font-bold font-mono uppercase cursor-pointer"
+                              >
+                                Set Default
+                              </button>
                             )}
-                          </strong>
+                          </div>
                           <p className="text-gray-600 mt-1">{addr.street}</p>
                           <p className="text-gray-500 font-semibold">{addr.city}, {addr.state} - {addr.pinCode}</p>
                           <p className="text-gray-400 font-mono mt-1">Ph: {addr.phone}</p>
                         </div>
-                      </label>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -450,19 +481,45 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
 
                   <div className="grid grid-cols-2 gap-3">
                     <input
+                      required
                       type="text"
-                      disabled
-                      placeholder="Delhi"
-                      className="w-full bg-gray-100 border border-gray-200 py-2.5 px-3 rounded-lg text-xs text-gray-500"
+                      placeholder="City/District"
+                      value={shipCity}
+                      onChange={(e) => setShipCity(e.target.value)}
+                      className="w-full bg-white border border-gray-200 py-2.5 px-3 rounded-lg text-xs focus:outline-none focus:border-[#306D29]"
                     />
                     <input
                       required
                       type="text"
-                      placeholder="PIN Code (6 digits)"
+                      placeholder="State"
+                      value={shipState}
+                      onChange={(e) => setShipState(e.target.value)}
+                      className="w-full bg-white border border-gray-200 py-2.5 px-3 rounded-lg text-xs focus:outline-none focus:border-[#306D29]"
+                    />
+                  </div>
+
+                  <div>
+                    <input
+                      required
+                      type="text"
+                      placeholder="6-Digit PIN Code"
                       value={shipPinCode}
                       onChange={(e) => setShipPinCode(e.target.value)}
                       className="w-full bg-white border border-gray-200 py-2.5 px-3 rounded-lg text-xs focus:outline-none focus:border-[#306D29]"
                     />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="shipIsDefault"
+                      checked={shipIsDefault}
+                      onChange={(e) => setShipIsDefault(e.target.checked)}
+                      className="text-[#306D29] focus:ring-[#306D29] h-4 w-4 border-gray-300 rounded cursor-pointer"
+                    />
+                    <label htmlFor="shipIsDefault" className="text-xs text-gray-700 font-bold select-none cursor-pointer">
+                      Make this my default address
+                    </label>
                   </div>
                 </div>
 
@@ -489,6 +546,7 @@ export const CheckoutCart: React.FC<CheckoutCartProps> = ({
                 upiId={upiId} 
                 amount={activeTotal} 
                 orderId={directBuyProduct ? "DIRECT_BUY" : "CART_MUTATION_FLOW"} 
+                customQrUrl={upiQrUrl || undefined}
               />
 
               {/* UPI Verification submission form */}

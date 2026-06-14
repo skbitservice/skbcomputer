@@ -226,7 +226,8 @@ export const dbService = {
         if (index > -1) addresses[index] = saved;
       } else {
         const newId = "addr-" + Math.random().toString(36).substr(2, 9);
-        saved = { ...address, id: newId, userId, isDefault: addresses.length === 0 } as Address;
+        const shouldBeDefault = address.isDefault === true || addresses.length === 0;
+        saved = { ...address, id: newId, userId, isDefault: shouldBeDefault } as Address;
         addresses.push(saved);
       }
 
@@ -261,9 +262,19 @@ export const dbService = {
         return { ...address, userId } as Address;
       } else {
         const list = await dbService.getAddresses(userId);
-        const isDefault = list.length === 0;
-        const cleanAddress = { ...address, userId, isDefault };
+        const shouldBeDefault = address.isDefault === true || list.length === 0;
+        const cleanAddress = { ...address, userId, isDefault: shouldBeDefault };
         const docRef = await addDoc(addressesRef, cleanAddress);
+
+        if (shouldBeDefault) {
+          // Unset others
+          for (const other of list) {
+            if (other.isDefault) {
+              await updateDoc(doc(db, "users", userId, "addresses", other.id), { isDefault: false });
+            }
+          }
+        }
+
         return { id: docRef.id, ...cleanAddress } as Address;
       }
     } catch (err) {
@@ -661,8 +672,8 @@ export const dbService = {
   },
 
   // =================== GLOBAL SETTINGS ===================
-  getGlobalSettings: async (): Promise<{ upiId: string }> => {
-    const defaultSettings = { upiId: "7011396007@paytm" };
+  getGlobalSettings: async (): Promise<{ upiId: string; upiQrUrl?: string }> => {
+    const defaultSettings = { upiId: "skbcomputer86@kotak", upiQrUrl: "" };
     if (isMockFirebase) {
       const stored = localStorage.getItem(STORAGE_SETTINGS_KEY);
       if (!stored) {
@@ -676,7 +687,7 @@ export const dbService = {
     try {
       const docSnap = await getDoc(doc(db, "settings", "global"));
       if (docSnap.exists()) {
-        const data = docSnap.data() as { upiId: string };
+        const data = docSnap.data() as { upiId: string; upiQrUrl?: string };
         localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(data));
         return data;
       } else {
@@ -696,15 +707,16 @@ export const dbService = {
     }
   },
 
-  updateGlobalSettings: async (upiId: string): Promise<void> => {
+  updateGlobalSettings: async (upiId: string, upiQrUrl?: string): Promise<void> => {
+    const data = { upiId, upiQrUrl: upiQrUrl || "", updatedAt: new Date().toISOString() };
     if (isMockFirebase) {
-      localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify({ upiId }));
+      localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify({ upiId, upiQrUrl: upiQrUrl || "" }));
       return;
     }
 
     const path = "settings/global";
     try {
-      await setDoc(doc(db, "settings", "global"), { upiId, updatedAt: new Date().toISOString() });
+      await setDoc(doc(db, "settings", "global"), data);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
     }

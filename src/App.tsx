@@ -9,6 +9,7 @@ import { Auth } from "./pages/Auth";
 import { Dashboard } from "./pages/Dashboard";
 import { AdminPanel } from "./pages/AdminPanel";
 import { CheckoutCart } from "./components/CheckoutCart";
+import { MobileBottomNav } from "./components/MobileBottomNav";
 import { Product } from "./types";
 import { auth } from "./firebase";
 
@@ -41,7 +42,7 @@ export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <div className="min-h-screen flex flex-col justify-between bg-gradient-to-b from-[#FBF5DD]/20 to-[#E7E1B1]/10 text-gray-800 antialiased selection:bg-[#306D29] selection:text-[#FBF5DD]">
+        <div className="min-h-screen flex flex-col justify-between bg-gradient-to-b from-[#FBF5DD]/20 to-[#E7E1B1]/10 text-gray-800 antialiased selection:bg-[#306D29] selection:text-[#FBF5DD] pb-16 md:pb-0">
           
           {/* Main header block */}
           <Header 
@@ -91,6 +92,13 @@ export default function App() {
             clearDirectBuy={handleClearDirectBuy}
           />
 
+          {/* Persistent sticky navigation at bottom only for mobile clients */}
+          <MobileBottomNav 
+            currentView={view}
+            setView={handleSetView}
+            openCartDrawer={() => setIsCartOpen(true)}
+          />
+
           {/* Universal Footer section list */}
           <Footer setView={handleSetView} />
 
@@ -99,3 +107,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

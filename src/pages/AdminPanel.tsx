@@ -19,7 +19,9 @@ export const AdminPanel: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [contacts, setContacts] = useState<ContactMessage[]>([]);
-  const [upiId, setUpiId] = useState("7011396007@paytm");
+  const [upiId, setUpiId] = useState("skbcomputer86@kotak");
+  const [upiQrUrl, setUpiQrUrl] = useState("");
+  const [isUploadingQr, setIsUploadingQr] = useState(false);
 
   // Loading & statuses
   const [loading, setLoading] = useState(true);
@@ -32,7 +34,7 @@ export const AdminPanel: React.FC = () => {
   const [pCategory, setPCategory] = useState<"service" | "accessory">("service");
   const [pPrice, setPPrice] = useState("");
   const [pStock, setPStock] = useState("");
-  const [pImage, setPImage] = useState("");
+  const [pImages, setPImages] = useState<string[]>([""]);
   const [pDescription, setPDescription] = useState("");
   const [pActive, setPActive] = useState(true);
 
@@ -56,8 +58,9 @@ export const AdminPanel: React.FC = () => {
       setOrders(ordList);
       setTickets(ticketList);
       setContacts(contactList);
-      if (settings && settings.upiId) {
-        setUpiId(settings.upiId);
+      if (settings) {
+        if (settings.upiId) setUpiId(settings.upiId);
+        if (settings.upiQrUrl) setUpiQrUrl(settings.upiQrUrl);
       }
     } catch (err) {
       console.error(err);
@@ -90,12 +93,31 @@ export const AdminPanel: React.FC = () => {
     if (!upiId) return;
 
     try {
-      await dbService.updateGlobalSettings(upiId);
-      setActionMsg("Default UPI Payee ID was updated across all QR payment checkouts!");
+      await dbService.updateGlobalSettings(upiId, upiQrUrl);
+      setActionMsg("Default UPI payee ID and static QR code updated successfully!");
       setTimeout(() => setActionMsg(""), 3000);
     } catch (err) {
       alert("Failed to store UPI settings.");
     }
+  };
+
+  // Convert uploaded QR image to Base64 to save directly into system settings
+  const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 1.2 * 1024 * 1024) {
+      alert("QR Code Image must be under 1.2MB for cloud network delivery optimization.");
+      return;
+    }
+
+    setIsUploadingQr(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setUpiQrUrl(reader.result as string);
+      setIsUploadingQr(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Create or Update Product
@@ -104,12 +126,14 @@ export const AdminPanel: React.FC = () => {
     if (!pName || !pPrice) return;
 
     try {
+      const validImages = pImages.filter(img => img.trim() !== "");
       const payload: Partial<Product> = {
         name: pName,
         category: pCategory,
         price: parseFloat(pPrice) || 0,
         stock: pCategory === "accessory" ? parseInt(pStock) || 0 : 999,
-        image_url: pImage,
+        image_url: validImages[0] || "",
+        image_urls: validImages,
         description: pDescription,
         active: pActive
       };
@@ -127,7 +151,7 @@ export const AdminPanel: React.FC = () => {
       setPName("");
       setPPrice("");
       setPStock("");
-      setPImage("");
+      setPImages([""]);
       setPDescription("");
       setPActive(true);
       setEditingProductId(null);
@@ -144,7 +168,11 @@ export const AdminPanel: React.FC = () => {
     setPCategory(p.category);
     setPPrice(p.price.toString());
     setPStock(p.stock.toString());
-    setPImage(p.image_url || "");
+    if (p.image_urls && p.image_urls.length > 0) {
+      setPImages(p.image_urls);
+    } else {
+      setPImages(p.image_url ? [p.image_url] : [""]);
+    }
     setPDescription(p.description);
     setPActive(p.active);
     setShowProductModal(true);
@@ -260,7 +288,7 @@ export const AdminPanel: React.FC = () => {
           })()}
         </div>
 
-        <div className="flex flex-col gap-1.5 font-sans font-bold text-xs">
+        <div className="flex flex-row md:flex-col gap-2 font-sans font-bold text-xs overflow-x-auto pb-2 md:pb-0 scrollbar-none w-full">
           {[
             { id: "overview", label: "Stats & Analytics", icon: <TrendingUp size={14} /> },
             { id: "orders", label: "Orders & Payments", icon: <CreditCard size={14} /> },
@@ -275,14 +303,14 @@ export const AdminPanel: React.FC = () => {
                 setActiveTab(tab.id as any);
                 setSelectedTicketId(null);
               }}
-              className={`w-full py-3 px-4 rounded-xl flex items-center gap-3 transition text-left cursor-pointer border ${
+              className={`py-3 px-4 rounded-xl flex items-center gap-2 transition text-left cursor-pointer border shrink-0 md:w-full ${
                 activeTab === tab.id
                   ? "bg-[#306D29] border-[#306D29] text-white shadow shadow-[#306D29]/20"
                   : "border-transparent text-[#4A6B43] hover:text-[#0D530E] hover:bg-[#E7E1B1]/10"
               }`}
             >
               {tab.icon}
-              <span>{tab.label}</span>
+              <span className="whitespace-nowrap">{tab.label}</span>
             </button>
           ))}
         </div>
@@ -478,7 +506,7 @@ export const AdminPanel: React.FC = () => {
                       setPCategory("service");
                       setPPrice("");
                       setPStock("");
-                      setPImage("");
+                      setPImages([""]);
                       setPDescription("");
                       setPActive(true);
                       setShowProductModal(true);
@@ -546,15 +574,45 @@ export const AdminPanel: React.FC = () => {
                         </div>
                       )}
 
-                      <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-[#4A6B43] uppercase tracking-wider mb-1.5">Image URL reference</label>
-                        <input
-                          type="text"
-                          value={pImage}
-                          onChange={(e) => setPImage(e.target.value)}
-                          placeholder="https://images.unsplash.com/photo-..."
-                          className="w-full bg-white border border-[#0d530e]/12 p-3 text-xs rounded-lg focus:outline-none focus:border-[#306D29]"
-                        />
+                      <div className="sm:col-span-2 space-y-2">
+                        <label className="block text-[10px] font-bold text-[#4A6B43] uppercase tracking-wider mb-1">Product Images (URLs)</label>
+                        <div className="space-y-2">
+                          {pImages.map((img, idx) => (
+                            <div key={idx} className="flex gap-2 items-center">
+                              <input
+                                type="text"
+                                value={img}
+                                onChange={(e) => {
+                                  const next = [...pImages];
+                                  next[idx] = e.target.value;
+                                  setPImages(next);
+                                }}
+                                placeholder={`Image URL #${idx + 1} (e.g. https://images.unsplash.com/...)`}
+                                className="flex-grow bg-white border border-[#0d530e]/12 p-3 text-xs rounded-lg focus:outline-none focus:border-[#306D29] font-medium"
+                              />
+                              {pImages.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = pImages.filter((_, i) => i !== idx);
+                                    setPImages(next);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 font-sans font-extrabold px-3 py-2.5 border border-red-200 hover:bg-red-50 rounded-lg text-xs cursor-pointer transition"
+                                  title="Remove Image"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPImages([...pImages, ""])}
+                          className="py-1.5 px-3 bg-[#4a6b43]/10 hover:bg-[#4a6b43]/20 text-[#306D29] text-[11px] font-bold font-sans rounded-lg transition cursor-pointer"
+                        >
+                          + Add Another Image URL
+                        </button>
                       </div>
 
                       <div className="sm:col-span-2">
@@ -801,29 +859,116 @@ export const AdminPanel: React.FC = () => {
                   <p className="text-xs text-[#4A6B43] mt-1 font-semibold uppercase tracking-wider font-mono">Adjust static parameters that appear dynamically during checkout payment QR flows</p>
                 </div>
 
-                <form onSubmit={handleSettingsSubmit} className="bg-white border border-[#0d530e]/12 p-6 sm:p-8 rounded-2xl space-y-4 max-w-sm">
-                  <div>
-                    <label className="block text-[10px] font-bold text-[#4A6B43] uppercase tracking-wider mb-1.5">Direct Payee UPI ID Address</label>
-                    <input
-                      required
-                      type="text"
-                      value={upiId}
-                      onChange={(e) => setUpiId(e.target.value)}
-                      placeholder="e.g. 7011396007@paytm"
-                      className="w-full bg-white border border-[#0d530e]/12 p-3 font-mono font-bold rounded-lg text-xs text-[#0D530E] focus:outline-none focus:border-[#306D29]"
-                    />
-                    <span className="text-[10px] text-gray-500 mt-1.5 block leading-normal font-semibold">
-                      * Modifying this UPI ID replaces the target payee inside checkout's generated Dynamic QR codes seamlessly!
-                    </span>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+                  {/* Settings Form */}
+                  <form onSubmit={handleSettingsSubmit} className="bg-white border border-[#0d530e]/12 p-6 sm:p-8 rounded-2xl space-y-5">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[#4A6B43] uppercase tracking-wider mb-1.5">Direct Payee UPI ID Address</label>
+                      <input
+                        required
+                        type="text"
+                        value={upiId}
+                        onChange={(e) => setUpiId(e.target.value)}
+                        placeholder="e.g. skbcomputer86@kotak"
+                        className="w-full bg-white border border-[#0d530e]/12 p-3 font-mono font-bold rounded-lg text-xs text-[#0D530E] focus:outline-none focus:border-[#306D29]"
+                      />
+                      <span className="text-[10px] text-gray-500 mt-1.5 block leading-normal font-semibold">
+                        * Modifying this UPI ID replaces the target payee inside checkout's generated Dynamic QR codes seamlessly!
+                      </span>
+                    </div>
 
-                  <button
-                    type="submit"
-                    className="w-full py-3 bg-[#306D29] hover:bg-[#0D530E] text-[#FBF5DD] rounded-xl font-bold font-sans text-xs tracking-wider uppercase transition cursor-pointer"
-                  >
-                    Save Payee Settings
-                  </button>
-                </form>
+                    <div className="border-t border-gray-100 pt-4 space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#4A6B43] uppercase tracking-wider mb-1.5">Custom UPI QR Code (Image URL or Base64)</label>
+                        <input
+                          type="text"
+                          value={upiQrUrl}
+                          onChange={(e) => setUpiQrUrl(e.target.value)}
+                          placeholder="Paste QR Code online Image link..."
+                          className="w-full bg-white border border-[#0d530e]/12 p-3 text-xs rounded-lg focus:outline-none focus:border-[#306D29] font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#4A6B43] uppercase tracking-wider mb-1.5">Or Upload QR Code Image</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleQrUpload}
+                          className="w-full text-xs text-gray-500 border border-[#0d530e]/12 p-2.5 rounded-lg bg-white"
+                        />
+                        {isUploadingQr && <span className="text-[10px] text-[#306D29] font-bold mt-1 block">Encoding QR code asset...</span>}
+                      </div>
+
+                      {upiQrUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setUpiQrUrl("")}
+                          className="text-xs text-red-600 hover:text-red-700 font-bold hover:underline cursor-pointer flex items-center gap-1 font-mono transition"
+                        >
+                          ✕ Clear Custom UPI QR Code Image
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isUploadingQr}
+                      className="w-full py-3 bg-[#306D29] hover:bg-[#0D530E] text-[#FBF5DD] rounded-xl font-bold font-sans text-xs tracking-wider uppercase transition cursor-pointer disabled:opacity-50"
+                    >
+                      Save Payee Settings
+                    </button>
+                  </form>
+
+                  {/* Settings Live QR Code Preview Card */}
+                  <div className="bg-[#FBF5DD] border border-[#0d530e]/12 p-6 sm:p-8 rounded-2xl flex flex-col justify-between max-w-sm">
+                    <div className="space-y-4">
+                      <div className="select-none">
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2 py-0.5 rounded tracking-widest font-mono uppercase">
+                          QR PREVIEW
+                        </span>
+                        <h4 className="font-bold text-sm text-gray-900 mt-2 font-sans">Payment Checkout QR Code</h4>
+                        <p className="text-xs text-gray-500 font-medium">This is how the custom or automatically generated QR code displays to customers during billing checkout.</p>
+                      </div>
+
+                      <div className="flex justify-center bg-white p-4 rounded-xl border border-[#0d530e]/8 shadow-inner relative max-w-[240px] mx-auto aspect-square overflow-hidden items-center">
+                        {upiQrUrl ? (
+                          <img
+                            src={upiQrUrl}
+                            alt="Custom uploaded UPI QR Code preview"
+                            className="w-full h-full object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          // Live fallback showing the deep link generated QR Code
+                          <img
+                            src={`https://chart.googleapis.com/chart?chs=220x220&cht=qr&chl=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=SKB_COMPUTER_AND_SERVICE&am=0.00&cu=INR`)}&choe=UTF-8`}
+                            alt="Default dynamic UPI QR Code preview"
+                            className="w-full h-full object-contain opacity-80"
+                            referrerPolicy="no-referrer"
+                          />
+                        )}
+                        
+                        {/* Overlay subtle watermark context */}
+                        {!upiQrUrl && (
+                          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-0.5 shadow border border-gray-100 flex items-center justify-center w-7 h-7">
+                            <div className="w-full h-full bg-[#012B5C] rounded-full flex items-center justify-center">
+                              <span className="text-[5px] text-white font-extrabold tracking-tighter">LIVE</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] text-gray-500 font-semibold border-t border-[#0d530e]/10 pt-4 leading-normal">
+                      {upiQrUrl ? (
+                        <span className="text-emerald-700 font-bold">✓ Active: Customers see your uploaded QR Code. Ensure valid payee coordinates matches the inputted UPI ID ({upiId}).</span>
+                      ) : (
+                        <span>✨ Active: Customers see dynamic generation built on-the-fly linking exact checkout bill values directly to payee address ({upiId}).</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

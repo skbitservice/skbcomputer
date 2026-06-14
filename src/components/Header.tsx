@@ -10,13 +10,42 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentView, setView, openCartDrawer }) => {
-  const { user, userProfile, logOut, isAdmin } = useAuth();
+  const { user, userProfile, logOut, isAdmin, isMock } = useAuth();
   const { itemCount } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showDbDiagnostic, setShowDbDiagnostic] = useState(false);
 
   const handleNavClick = (view: string) => {
     setView(view);
     setMobileMenuOpen(false);
+  };
+
+  const isSimulated = isMock || localStorage.getItem("skb_use_simulated_db") === "true";
+  const firestoreError = sessionStorage.getItem("firestore_connection_error");
+
+  const handleToggleDbMode = () => {
+    if (isMock) {
+      alert("Note: No real Firebase configuration detected in firebase-applet-config.json. The application is running securely in simulated Sandbox mode.");
+      return;
+    }
+    
+    const currentSim = localStorage.getItem("skb_use_simulated_db") === "true";
+    if (currentSim && firestoreError) {
+      // Trying to switch to Live, but we already have an active error cached. Let's warn them!
+      setShowDbDiagnostic(true);
+      return;
+    }
+
+    const nextSim = !currentSim;
+    localStorage.setItem("skb_use_simulated_db", String(nextSim));
+    
+    if (!nextSim && firestoreError) {
+      // Activating Live mode, show diagnostic guide as well!
+      setShowDbDiagnostic(true);
+    } else {
+      alert(`Database Mode switched successfully! Now active: ${nextSim ? "Interactive Local Sandbox" : "Real-time Google Cloud Firestore"}. The application will refresh now.`);
+      window.location.reload();
+    }
   };
 
   const dashboardViewField = isAdmin ? "admin-panel" : "user-dashboard";
@@ -76,6 +105,21 @@ export const Header: React.FC<HeaderProps> = ({ currentView, setView, openCartDr
 
         {/* Action Panel */}
         <div className="flex items-center gap-4 shrink-0">
+          {/* Database Connection Mode Badge */}
+          <button
+            onClick={handleToggleDbMode}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold uppercase tracking-wider transition-all border ${
+              isSimulated 
+                ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100" 
+                : "bg-emerald-50/80 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+            }`}
+            title={isSimulated ? "Click to switch to Live Cloud Firestore" : "Click to switch to Sandbox Sandbox"}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isSimulated ? "bg-amber-500 animate-pulse" : "bg-emerald-600"}`} />
+            <span className="hidden sm:inline">{isSimulated ? "Sandbox" : "Live DB"}</span>
+            <span className="sm:hidden">{isSimulated ? "Sandbox" : "Live"}</span>
+          </button>
+
           {/* Phone Call Button */}
           <a 
             href="tel:7011396007" 
@@ -196,6 +240,16 @@ export const Header: React.FC<HeaderProps> = ({ currentView, setView, openCartDr
                 <span>Log In / Create Account</span>
               </button>
             )}
+            <button
+              onClick={handleToggleDbMode}
+              className={`text-left py-2 border-b border-[#0d530e]/5 font-bold flex items-center gap-2 ${
+                isSimulated ? "text-amber-700" : "text-emerald-700"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${isSimulated ? "bg-amber-500" : "bg-emerald-600"}`} />
+              <span>Database: {isSimulated ? "Sandbox" : "Live Firestore"}</span>
+            </button>
+
             <div className="pt-2">
               <a 
                 href="tel:7011396007"
@@ -205,6 +259,90 @@ export const Header: React.FC<HeaderProps> = ({ currentView, setView, openCartDr
                 <span>Call Hotline: 7011396007</span>
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showDbDiagnostic && (
+        <div className="fixed inset-0 z-50 bg-[#0d530e]/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-rose-100 max-w-lg w-full p-6 shadow-2xl relative animate-scaleUp">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="bg-rose-50 text-rose-600 p-2.5 rounded-full shrink-0">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-gray-900 leading-snug">
+                  Firestore Database Not Yet Active!
+                </h3>
+                <p className="text-[11px] font-mono text-rose-500 font-bold uppercase tracking-wider mt-0.5">
+                  error: database "(default)" not found
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5 text-xs text-gray-600 leading-normal">
+              <p>
+                We detected that your Firebase configuration has been successfully imported into the app, but Google Cloud's <strong>Firestore Database</strong> has not been fully initialized yet inside your project <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-bold font-mono">yugsharma</code>.
+              </p>
+              
+              <div className="bg-[#FBF5DD]/60 border border-[#0d530e]/10 p-4 rounded-xl space-y-2">
+                <p className="font-bold text-[#0D530E] text-[11px] uppercase tracking-wider mb-1">
+                  🛠️ Easy Step-By-Step Resolution Guide:
+                </p>
+                <ol className="list-decimal pl-4 space-y-1.5 font-semibold text-[#4A6B43]">
+                  <li>
+                    Open the <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="underline text-[#306D29] hover:text-[#0D530E] font-bold">Firebase Console</a> website.
+                  </li>
+                  <li>
+                    Click and enter your project card named <strong>yugsharma</strong>.
+                  </li>
+                  <li>
+                    Go to <strong>Firestore Database</strong> in the left sidebar menu (located under Build).
+                  </li>
+                  <li>
+                    Click the <strong>"Create Database"</strong> button and follow the simple on-screen options (start in test/development mode with default settings).
+                  </li>
+                  <li>
+                    Once built in the console, your database is live! Tap <strong>"Switch sandbox mode off"</strong> below to refresh &amp; connect!
+                  </li>
+                </ol>
+              </div>
+
+              <p className="text-[11px] text-gray-500 leading-normal font-semibold">
+                * Note: Your direct Kotak UPI setup (<code className="font-mono bg-gray-50 p-1 rounded font-bold text-gray-700 font-semibold text-xs text-emerald-800">skbcomputer86@kotak</code>) is ready. You can safely toggle Sandbox mode back on to test local checkouts flawlessly anytime.
+              </p>
+            </div>
+
+            <div className="mt-6 flex flex-col sm:flex-row gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem("skb_use_simulated_db", "true");
+                  setShowDbDiagnostic(false);
+                  window.location.reload();
+                }}
+                className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition shadow cursor-pointer text-center"
+              >
+                Use Interactive Sandbox (Recommended)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.setItem("skb_use_simulated_db", "false");
+                  setShowDbDiagnostic(false);
+                  window.location.reload();
+                }}
+                className="flex-1 py-3 bg-[#306D29] hover:bg-[#0D530E] text-white font-sans font-bold text-xs uppercase tracking-wider rounded-xl transition shadow cursor-pointer text-center"
+              >
+                Retry Active Live Firestore Connection
+              </button>
+            </div>
+            <button
+              onClick={() => setShowDbDiagnostic(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 font-bold transition font-sans text-sm p-1.5 rounded-lg hover:bg-gray-100 cursor-pointer"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

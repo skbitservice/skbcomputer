@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 import firebaseConfig from "./firebase-applet-config.json";
 
 // Check if we are running in mock preview mode
@@ -9,6 +10,7 @@ export const isMockFirebase = firebaseConfig.apiKey === "mock-api-key" || !fireb
 let appInstance;
 let authInstance: any;
 let dbInstance: any;
+let rtdbInstance: any;
 
 try {
   if (!isMockFirebase) {
@@ -19,6 +21,13 @@ try {
     } else {
       dbInstance = getFirestore(appInstance);
     }
+    
+    if (firebaseConfig.databaseURL) {
+      rtdbInstance = getDatabase(appInstance, firebaseConfig.databaseURL);
+    } else {
+      rtdbInstance = getDatabase(appInstance);
+    }
+    
     authInstance = getAuth(appInstance);
   }
 } catch (error) {
@@ -26,6 +35,7 @@ try {
 }
 
 export const db = dbInstance;
+export const rtdb = rtdbInstance;
 export const auth = authInstance;
 
 async function testConnection() {
@@ -33,11 +43,18 @@ async function testConnection() {
   try {
     await getDocFromServer(doc(db, "test", "connection"));
     console.log("Firebase Firestore connected successfully.");
+    sessionStorage.removeItem("firestore_connection_error");
   } catch (error) {
-    if (error instanceof Error && error.message.includes("the client is offline")) {
+    const errorStr = error instanceof Error ? error.message : String(error);
+    if (errorStr.includes("the client is offline")) {
       console.warn("Please check your Firebase configuration.");
     } else {
       console.warn("Firestore connection check resolved:", error);
+      if (errorStr.includes("Database") && (errorStr.includes("not found") || errorStr.includes("(default)"))) {
+        sessionStorage.setItem("firestore_connection_error", "database_not_found");
+      } else {
+        sessionStorage.setItem("firestore_connection_error", errorStr);
+      }
     }
   }
 }

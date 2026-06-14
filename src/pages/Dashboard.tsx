@@ -259,7 +259,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {/* Tab Links */}
-        <div className="flex flex-col gap-1.5 font-sans font-bold text-xs">
+        <div className="flex flex-row md:flex-col gap-2 font-sans font-bold text-xs overflow-x-auto pb-2 md:pb-0 scrollbar-none w-full">
           {[
             { id: "orders", label: "Track My Orders", icon: <Package size={14} /> },
             { id: "tickets", label: "Support Tickets", icon: <MessageSquare size={14} /> },
@@ -273,14 +273,14 @@ export const Dashboard: React.FC = () => {
                 setSelectedTicketId(null);
                 setShowAddTicket(false);
               }}
-              className={`w-full py-3 px-4 rounded-xl flex items-center gap-3 transition text-left cursor-pointer border ${
+              className={`py-3 px-4 rounded-xl flex items-center gap-2 transition text-left cursor-pointer border shrink-0 md:w-full ${
                 activeTab === tab.id
                   ? "bg-[#306D29] border-[#306D29] text-white shadow shadow-[#306D29]/20"
                   : "border-transparent text-[#4A6B43] hover:text-[#0D530E] hover:bg-[#E7E1B1]/10"
               }`}
             >
               {tab.icon}
-              <span>{tab.label}</span>
+              <span className="whitespace-nowrap">{tab.label}</span>
             </button>
           ))}
         </div>

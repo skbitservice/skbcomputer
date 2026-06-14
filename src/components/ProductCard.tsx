@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Product } from "../types";
 import { useCart } from "../context/CartContext";
-import { ShoppingBag, ZoomIn, Check } from "lucide-react";
+import { ShoppingBag, ZoomIn, Check, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface ProductCardProps {
   product: Product;
@@ -12,6 +12,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
   const { addToCart } = useCart();
   const [added, setAdded] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
   const isService = product.category === "service";
   const outOfStock = !isService && product.stock <= 0;
@@ -23,28 +24,89 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
     setTimeout(() => setAdded(false), 2000);
   };
 
-  // Image Gallery fallbacks
-  const mainImage = product.image_url || "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=500&q=80";
-  const extraImages = [
-    mainImage,
-    "https://images.unsplash.com/photo-1601524909162-be87252be298?w=500&q=80",
-    "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&q=80",
-  ];
+  // Build the list of images
+  const defaultFallback = "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=500&q=80";
+  const mainImage = product.image_url || defaultFallback;
+  
+  // Use product's custom array of images if available, otherwise fallback
+  const sliderImages = (product.image_urls && product.image_urls.length > 0)
+    ? product.image_urls
+    : [
+        mainImage,
+        "https://images.unsplash.com/photo-1601524909162-be87252be298?w=500&q=80",
+        "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=500&q=80",
+      ];
+
+  const handlePrevSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveSlideIndex((prev) => (prev === 0 ? sliderImages.length - 1 : prev - 1));
+  };
+
+  const handleNextSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveSlideIndex((prev) => (prev === sliderImages.length - 1 ? 0 : prev + 1));
+  };
 
   return (
     <div className="bg-[#FBF5DD] border border-[#0d530e]/12 rounded-xl overflow-hidden flex flex-col justify-between hover:-translate-y-1 hover:shadow-lg hover:border-[#306D29] transition-all group duration-300">
       
-      {/* Product Image Section */}
+      {/* Product Image Slider Section */}
       <div className="relative aspect-video w-full overflow-hidden bg-emerald-950/20 select-none">
+        
+        {/* Active Image */}
         <img
-          src={mainImage}
-          alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          src={sliderImages[activeSlideIndex] || defaultFallback}
+          alt={`${product.name} - slide ${activeSlideIndex + 1}`}
+          className="w-full h-full object-cover transition-all duration-500 ease-out"
           referrerPolicy="no-referrer"
         />
+
+        {/* Carousel Arrow Controls (only if multiple images survive) */}
+        {sliderImages.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrevSlide}
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-[#0D530E] p-1.5 rounded-full transition duration-200 z-10 cursor-pointer shadow-sm md:opacity-0 md:group-hover:opacity-100"
+              title="Previous Image"
+              id={`prev-slide-${product.id}`}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={handleNextSlide}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/70 hover:bg-white text-[#0D530E] p-1.5 rounded-full transition duration-200 z-10 cursor-pointer shadow-sm md:opacity-0 md:group-hover:opacity-100"
+              title="Next Image"
+              id={`next-slide-${product.id}`}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </>
+        )}
+
+        {/* Carousel indicators dots */}
+        {sliderImages.length > 1 && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10 bg-black/25 backdrop-blur-xs py-1 px-2 rounded-full">
+            {sliderImages.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveSlideIndex(idx);
+                }}
+                className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${
+                  activeSlideIndex === idx ? "bg-white scale-125 w-2.5" : "bg-white/50"
+                }`}
+                title={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
         
         {/* Category Tag */}
-        <span className={`absolute top-3 left-3 px-2.5 py-1 text-[10px] font-mono tracking-wider uppercase font-bold rounded-full ${
+        <span className={`absolute top-3 left-3 px-2.5 py-1 text-[10px] font-mono tracking-wider uppercase font-bold rounded-full z-10 ${
           isService ? "bg-[#306D29] text-white" : "bg-[#E7912E] text-white"
         }`}>
           {product.category}
@@ -53,7 +115,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
         {/* View Details/Gallery Button */}
         <button
           onClick={() => setShowGallery(true)}
-          className="absolute right-3 top-3 bg-white/80 backdrop-blur-md p-2 rounded-full text-[#0D530E] opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute right-3 top-3 bg-white/80 backdrop-blur-md p-2 rounded-full text-[#0D530E] opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
           title="View Image Gallery"
         >
           <ZoomIn size={14} />
@@ -66,7 +128,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
           <h3 className="font-sans font-bold text-[#0D530E] text-base leading-snug group-hover:text-[#306D29] transition-colors line-clamp-1">
             {product.name}
           </h3>
-          <p className="text-[#4A6B43] text-xs leading-relaxed line-clamp-3">
+          <p className="text-[#4A6B43] text-xs leading-relaxed line-clamp-3 font-medium">
             {product.description}
           </p>
         </div>
@@ -74,7 +136,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
         {/* Price & Stock info */}
         <div className="w-full flex items-center justify-between border-t border-[#0d530e]/5 pt-3">
           <div className="flex flex-col">
-            <span className="text-xs text-[#4A6B43]">
+            <span className="text-xs text-[#4A6B43] font-semibold">
               {isService ? "Starts From" : "Retail Price"}
             </span>
             <span className="text-base font-sans font-bold text-gray-900">
@@ -145,30 +207,38 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onBuyNow }) =
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative">
             <button
               onClick={() => setShowGallery(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-black font-bold focus:outline-none"
+              className="absolute top-4 right-4 text-gray-500 hover:text-black font-extrabold focus:outline-none p-1.5 rounded-lg hover:bg-gray-100 text-sm cursor-pointer"
             >
               ✕
             </button>
             <h4 className="font-bold text-lg mb-4 text-[#0D530E]">{product.name} Photos</h4>
             
             <div className="grid grid-cols-1 gap-4 mb-4 select-none">
-              <img src={mainImage} alt={product.name} className="w-full h-48 object-cover rounded-xl" />
+              <img 
+                src={sliderImages[activeSlideIndex] || defaultFallback} 
+                alt={product.name} 
+                className="w-full h-56 object-cover rounded-xl border border-gray-100" 
+                referrerPolicy="no-referrer"
+              />
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {extraImages.map((img, i) => (
+            <div className="grid grid-cols-4 gap-2">
+              {sliderImages.map((img, i) => (
                 <img 
                   key={i} 
-                  src={img} 
+                  src={img || defaultFallback} 
                   alt="Gallery thumb" 
-                  className="w-full h-20 object-cover rounded-lg cursor-pointer hover:opacity-85 transition" 
+                  onClick={() => setActiveSlideIndex(i)}
+                  className={`w-full h-16 object-cover rounded-lg cursor-pointer transition border-2 ${
+                    activeSlideIndex === i ? "border-[#306D29] opacity-100" : "border-transparent opacity-70 hover:opacity-100"
+                  }`} 
                   referrerPolicy="no-referrer"
                 />
               ))}
             </div>
 
             <p className="text-xs text-gray-500 mt-4 leading-relaxed font-semibold">
-              * The display showcases the device profile. Final visual layout in store may fluctuate depending on exactly supported laptop revisions.
+              * This catalog showcase exhibits detail profiles. Final dynamic parts or physical layout may vary slightly based on actual configurations.
             </p>
           </div>
         </div>

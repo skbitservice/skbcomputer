@@ -8,6 +8,7 @@ export interface Product {
   price: number;
   stock: number;
   image_url?: string;
+  image_urls?: string[];
   active: boolean; // boolean visibility
   createdAt?: string;
   updatedAt?: string;
